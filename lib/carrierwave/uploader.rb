@@ -24,7 +24,6 @@ module CarrierWave
     #
     class Base
       attr_reader :file
-      attr_accessor :attributes
 
       include CarrierWave::Uploader::Callbacks
       include CarrierWave::Uploader::Proxy
@@ -39,6 +38,7 @@ module CarrierWave
       include CarrierWave::Uploader::Versions
       include CarrierWave::Uploader::DefaultUrl
       include CarrierWave::Uploader::Configuration
+      include CarrierWave::Uploader::Attributes
     end # Base
 
   end # Uploader
