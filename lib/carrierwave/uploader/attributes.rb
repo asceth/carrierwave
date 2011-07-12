@@ -5,11 +5,19 @@ module CarrierWave
     module Attributes
       def attributes=(attrs)
         @attributes = attrs
-        process! unless attributes.values.map(&:blank?).all?
+        recursively_apply_attributes_to_versions
+
+        recreate_versions! unless attributes.values.map(&:blank?).all?
       end
 
       def attributes
         @attributes || {}
+      end
+
+      def recursively_apply_attributes_to_versions
+        versions.each do |name, version|
+          version.instance_variable_set(:@attributes, attributes)
+        end
       end
     end # Attributes
   end # Uploader
