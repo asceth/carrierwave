@@ -173,6 +173,10 @@ module CarrierWave
           _mounter(:#{column}).cache(new_file)
         end
 
+        def #{column}_attributes
+          #{column}.attributes
+        end
+
         def #{column}_attributes=(attributes)
           #{column}.attributes = attributes
         end
@@ -287,7 +291,6 @@ module CarrierWave
     class Mounter #:nodoc:
       attr_reader :column, :record, :remote_url, :integrity_error, :processing_error
       attr_accessor :remove
-      attr_accessor :attributes
 
       def initialize(record, column, options={})
         @record = record

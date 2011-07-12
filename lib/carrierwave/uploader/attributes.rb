@@ -3,8 +3,10 @@
 module CarrierWave
   module Uploader
     module Attributes
-
-      attr_accessor :attributes
+      def attributes=(attrs)
+        @attributes = attrs
+        process! unless attributes.values.map(&:blank?).all?
+      end
 
       def attributes
         @attributes || {}
@@ -12,3 +14,4 @@ module CarrierWave
     end # Attributes
   end # Uploader
 end # CarrierWave
+
