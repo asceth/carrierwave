@@ -150,6 +150,17 @@ describe CarrierWave::Mount do
 
     end
 
+    describe '#image_attributes=' do
+      it "should set the uploader's attributes" do
+        attributes = {:x => 10, :y => 10, :w => 100, :h => 100}
+
+        @instance.should_receive(:image).and_return(@uploader)
+        @uploader.should_receive(:attributes=).and_return(attributes)
+
+        @instance.image_attributes = attributes
+      end
+    end
+
     describe '#image?' do
 
       it "should be false when nothing has been assigned" do

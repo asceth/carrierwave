@@ -24,6 +24,7 @@ module CarrierWave
     #
     class Base
       attr_reader :file
+      attr_accessor :attributes
 
       include CarrierWave::Uploader::Callbacks
       include CarrierWave::Uploader::Proxy
