@@ -55,6 +55,7 @@ module CarrierWave
     autoload :Url, 'carrierwave/uploader/url'
     autoload :Mountable, 'carrierwave/uploader/mountable'
     autoload :Configuration, 'carrierwave/uploader/configuration'
+    autoload :Attributes, 'carrierwave/uploader/attributes'
   end
 
   module Compatibility
