@@ -97,22 +97,44 @@ describe CarrierWave::ActiveRecord do
         JSON.parse(@event.to_json)["event#{$arclass}"]["image"].should == {"url" => "/uploads/test.jpeg"}
       end
 
+      it "should return valid JSON when to_json is called on a collection containing uploader from a model" do
+        @event[:image] = 'test.jpeg'
+        @event.save!
+        @event.reload
+
+        JSON.parse({:data => @event.image}.to_json).should == {"data"=>{"image"=>{"url"=>"/uploads/test.jpeg"}}}
+      end
+
       it "should return valid XML when to_xml is called when image is nil" do
         @event[:image].should be_nil
         hash = Hash.from_xml(@event.to_xml)["event#{$arclass}"]
         hash.keys.should include("image")
-        hash["image"].should be_nil
+        hash["image"].keys.should include("url")
+        hash["image"]["url"].should be_nil
       end
 
-      # FIXME to_xml should work like to_json
-      pending do
-        it "should return valid XML when to_xml is called when image is present" do
-          @event[:image] = 'test.jpeg'
-          @event.save!
-          @event.reload
+      it "should return valid XML when to_xml is called when image is present" do
+        @event[:image] = 'test.jpeg'
+        @event.save!
+        @event.reload
 
-          Hash.from_xml(@event.to_xml)["event#{$arclass}"]["image"].should == {"url" => "/uploads/test.jpeg"}
-        end
+        Hash.from_xml(@event.to_xml)["event#{$arclass}"]["image"].should == {"url" => "/uploads/test.jpeg"}
+      end
+
+      it "should respect options[:only] when passed to as_json for the serializable hash" do
+        @event[:image] = 'test.jpeg'
+        @event.save!
+        @event.reload
+
+        @event.as_json(:only => [:foo])["event#{$arclass}"].should == {"foo" => nil}
+      end
+
+      it "should respect options[:except] when passed to as_json for the serializable hash" do
+        @event[:image] = 'test.jpeg'
+        @event.save!
+        @event.reload
+
+        @event.as_json(:except => [:id, :image, :foo])["event#{$arclass}"].should == {"textfile" => nil}
       end
     end
 
@@ -162,7 +184,7 @@ describe CarrierWave::ActiveRecord do
             @event.image = stub_file('test.jpg')
             @event.should_not be_valid
             @event.valid?
-            @event.errors[:image].should == ['Het opladen van "jpg" bestanden is niet toe gestaan. Geaccepteerde types: ["txt"]']
+            @event.errors[:image].should == ['Het opladen van "jpg" bestanden is niet toe gestaan. Geaccepteerde types: txt']
           end
         end
       end
@@ -296,7 +318,19 @@ describe CarrierWave::ActiveRecord do
       end
     end
 
-    describe "dirty tracking with remote_image_url" do
+    describe "remove_image!" do
+      before do
+        @event.image = stub_file('test.jpeg')
+        @event.save!
+        @event.remove_image!
+      end
+
+      it "should clear the serialization column" do
+        @event.attributes['image'].should be_blank
+      end
+    end
+
+    describe "#remote_image_url=" do
 
       # FIXME ideally image_changed? and remote_image_url_changed? would return true
       it "should mark image as changed when setting remote_image_url" do
@@ -308,9 +342,98 @@ describe CarrierWave::ActiveRecord do
         @event.image_changed?.should be_false
       end
 
+      context 'when validating download' do
+        before do
+          @uploader.class_eval do
+            def download! file
+              raise CarrierWave::DownloadError
+            end
+          end
+          @event.remote_image_url = 'http://www.example.com/missing.jpg'
+        end
+
+        it "should make the record invalid when a download error occurs" do
+          @event.should_not be_valid
+        end
+
+        it "should use I18n for download errors without messages" do
+          @event.valid?
+          @event.errors[:image].should == ['could not be downloaded']
+
+          change_locale_and_store_translations(:pt, :activerecord => {
+            :errors => {
+              :messages => {
+                :carrierwave_download_error => 'não pode ser descarregado'
+              }
+            }
+          }) do
+            @event.should_not be_valid
+            @event.errors[:image].should == ['não pode ser descarregado']
+          end
+        end
+      end
+
+    end
+
+    describe "#serializable_hash" do
+
+      it "should include the image with url" do
+        @event.image = stub_file("test.jpg")
+        @event.serializable_hash["image"].should have_key("url")
+      end
+
+      it "should include the other columns" do
+        ["id", "foo"].each do |key|
+          @event.serializable_hash.should have_key(key)
+        end
+      end
+
+      it "should take an option to exclude the image column" do
+        @event.serializable_hash(:except => :image).should_not have_key("image")
+      end
+
+      it "should take an option to only include the image column" do
+        @event.serializable_hash(:only => :image).should have_key("image")
+      end
+
+      context "with multiple uploaders" do
+
+        before do
+          @uploader1 = Class.new(CarrierWave::Uploader::Base)
+          @class.mount_uploader(:textfile, @uploader1)
+          @event = @class.new
+          @event.image = stub_file('old.jpeg')
+          @event.textfile = stub_file('old.txt')
+        end
+
+        it "serializes the correct values" do
+          @event.serializable_hash["image"]["url"].should match(/old\.jpeg$/)
+          @event.serializable_hash["textfile"]["url"].should match(/old\.txt$/)
+        end
+
+        it "should have JSON for each uploader" do
+          parsed = JSON.parse(@event.to_json)
+          parsed["event#{$arclass}"]["image"]["url"].should match(/old\.jpeg$/)
+          parsed["event#{$arclass}"]["textfile"]["url"].should match(/old\.txt$/)
+        end
+      end
     end
 
     describe '#destroy' do
+
+      it "should not raise an error with a custom filename" do
+        @uploader.class_eval do
+          def filename
+            "page.jpeg"
+          end
+        end
+
+        @event.image = stub_file('test.jpeg')
+        @event.save.should be_true
+        expect {
+          @event.destroy
+        }.to_not raise_error
+      end
 
       it "should do nothing when no file has been assigned" do
         @event.save.should be_true

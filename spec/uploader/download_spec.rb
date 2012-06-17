@@ -73,9 +73,22 @@ describe CarrierWave::Uploader::Download do
       @uploader.should have_permissions(0777)
     end
 
+    it "should set directory permissions if options are given" do
+      @uploader_class.directory_permissions = 0777
+
+      @uploader.download!('http://www.example.com/test.jpg')
+      @uploader.should have_directory_permissions(0777)
+    end
+
     it "should raise an error when trying to download a local file" do
       running {
         @uploader.download!('/etc/passwd')
+      }.should raise_error(CarrierWave::DownloadError)
+    end
+
+    it "should raise an error when trying to download a missing file" do
+      running {
+        @uploader.download!('http://www.example.com/missing.jpg')
       }.should raise_error(CarrierWave::DownloadError)
     end
 

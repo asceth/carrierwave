@@ -238,31 +238,69 @@ module CarrierWave
     # === Yields
     #
     # [Magick::Image] manipulations to perform
+    # [Integer] Frame index if the image contains multiple frames
+    # [Hash] options, see below
+    #
+    # === Options
+    #
+    # The options argument to this method is also yielded as the third
+    # block argument.
+    #
+    # Currently, the following options are defined:
+    #
+    # ==== :write
+    # A hash of assignments to be evaluated in the block given to the RMagick write call.
+    #
+    # An example:
+    # 
+    #      manipulate! do |img, index, options|
+    #        options[:write] = {
+    #          :quality => 50,
+    #          :depth => 8
+    #        }
+    #        img
+    #      end
+    #
+    # This will translate to the following RMagick::Image#write call: 
+    # 
+    #     image.write do |img|
+    #       self.quality = 50
+    #       self.depth = 8
+    #     end
+    #   
+    # ==== :format
+    # Specify the output format. If unset, the filename extension is used to determine the format. 
     #
     # === Raises
     #
     # [CarrierWave::ProcessingError] if manipulation failed.
     #
-    def manipulate!(options={})
+    def manipulate!(options={}, &block)
       cache_stored_file! if !cached?
       image = ::Magick::Image.read(current_path)
 
       frames = if image.size > 1
         list = ::Magick::ImageList.new
-        image.each do |frame|
-          list << (block_given? ? yield( frame ) : frame)
+        image.each_with_index do |frame, index|
+          processed_frame = if block_given?
+            yield *[frame, index, options].take(block.arity)
+          else
+            frame
+          end
+          list << processed_frame if processed_frame
         end
         block_given? ? list : list.append(true)
       else
         frame = image.first
-        frame = yield( frame ) if block_given?
+        frame = yield( *[frame, 0, options].take(block.arity) ) if block_given?
         frame
       end
 
+      write_block = create_write_block(options[:write])
       if options[:format]
-        frames.write("#{options[:format]}:#{current_path}")
+        frames.write("#{options[:format]}:#{current_path}", &write_block)
       else
-        frames.write(current_path)
+        frames.write(current_path, &write_block)
       end
       destroy_image(frames)
     rescue ::Magick::ImageMagickError => e
@@ -270,6 +308,13 @@ module CarrierWave
     end
 
   private
+
+    def create_write_block(write_options)
+      return nil unless write_options
+      assignments = write_options.map { |k, v| "self.#{k} = #{v}" }
+      code = "lambda { |img| " + assignments.join(";") + "}"
+      eval code
+    end
 
     def destroy_image(image)
       image.destroy! if image.respond_to?(:destroy!)

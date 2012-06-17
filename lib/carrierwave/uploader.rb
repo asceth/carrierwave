@@ -39,6 +39,7 @@ module CarrierWave
       include CarrierWave::Uploader::DefaultUrl
       include CarrierWave::Uploader::Configuration
       include CarrierWave::Uploader::Attributes
+      include CarrierWave::Uploader::Serialization
     end # Base
 
   end # Uploader

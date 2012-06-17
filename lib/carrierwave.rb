@@ -56,6 +56,7 @@ module CarrierWave
     autoload :Mountable, 'carrierwave/uploader/mountable'
     autoload :Configuration, 'carrierwave/uploader/configuration'
     autoload :Attributes, 'carrierwave/uploader/attributes'
+    autoload :Serialization, 'carrierwave/uploader/serialization'
   end
 
   module Compatibility
@@ -95,7 +96,7 @@ elsif defined?(Rails)
   end
 
 elsif defined?(Sinatra)
-  if defined?(Padrino)
+  if defined?(Padrino) && defined?(PADRINO_ROOT)
     CarrierWave.root = File.join(PADRINO_ROOT, "public")
   else
 

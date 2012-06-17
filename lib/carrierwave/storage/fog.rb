@@ -62,6 +62,11 @@ module CarrierWave
     #     end
     #
     class Fog < Abstract
+      class << self
+        def connection_cache
+          @connection_cache ||= {}
+        end
+      end
 
       ##
       # Store a file
@@ -97,7 +102,8 @@ module CarrierWave
 
       def connection
         @connection ||= begin
-          ::Fog::Storage.new(uploader.fog_credentials)
+          credentials = uploader.fog_credentials
+          self.class.connection_cache[credentials] ||= ::Fog::Storage.new(credentials)
         end
       end
 
@@ -223,6 +229,16 @@ module CarrierWave
         end
 
         ##
+        # Check if the file exists on the remote service
+        #
+        # === Returns
+        #
+        # [Boolean] true if file exists or false
+        def exists?
+          !!directory.files.head(path)
+        end
+
+        ##
         # Write file to service
         #
         # === Returns
@@ -237,6 +253,7 @@ module CarrierWave
             :key          => path,
             :public       => @uploader.fog_public
           }.merge(@uploader.fog_attributes))
+          fog_file.close if fog_file && !fog_file.closed?
           true
         end
 
@@ -251,7 +268,11 @@ module CarrierWave
         #
         def public_url
           if host = @uploader.fog_host
-            "#{host}/#{path}"
+            if host.respond_to? :call
+              "#{host.call(self)}/#{path}"
+            else
+              "#{host}/#{path}"
+            end
           else
             # AWS/Google optimized for speed over correctness
             case @uploader.fog_credentials[:provider]
@@ -326,7 +347,7 @@ module CarrierWave
         # [Fog::#{provider}::File] file data from remote service
         #
         def file
-          @file ||= directory.files.get(path)
+          @file ||= directory.files.head(path)
         end
 
       end

@@ -48,11 +48,11 @@ module CarrierWave
         end
 
         def failure_message
-          "expected #{@actual.inspect} to have permissions #{@expected.to_s(8)}, but they were #{(File.stat(@actual.path).mode & 0777).to_s(8)}"
+          "expected #{@actual.current_path.inspect} to have permissions #{@expected.to_s(8)}, but they were #{(File.stat(@actual.path).mode & 0777).to_s(8)}"
         end
 
         def negative_failure_message
-          "expected #{@actual.inspect} not to have permissions #{@expected.to_s(8)}, but it did"
+          "expected #{@actual.current_path.inspect} not to have permissions #{@expected.to_s(8)}, but it did"
         end
 
         def description
@@ -62,6 +62,34 @@ module CarrierWave
 
       def have_permissions(expected)
         HavePermissions.new(expected)
+      end
+
+      class HaveDirectoryPermissions # :nodoc:
+        def initialize(expected)
+          @expected = expected
+        end
+
+        def matches?(actual)
+          @actual = actual
+          # Satisfy expectation here. Return false or raise an error if it's not met.
+          (File.stat(File.dirname @actual.path).mode & 0777) == @expected
+        end
+
+        def failure_message
+          "expected #{File.dirname @actual.current_path.inspect} to have permissions #{@expected.to_s(8)}, but they were #{(File.stat(@actual.path).mode & 0777).to_s(8)}"
+        end
+
+        def negative_failure_message
+          "expected #{File.dirname @actual.current_path.inspect} not to have permissions #{@expected.to_s(8)}, but it did"
+        end
+
+        def description
+          "have permissions #{@expected.to_s(8)}"
+        end
+      end
+
+      def have_directory_permissions(expected)
+        HaveDirectoryPermissions.new(expected)
       end
 
       class BeNoLargerThan # :nodoc:
